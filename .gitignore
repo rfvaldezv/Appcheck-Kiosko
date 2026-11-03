@@ -1,0 +1,23 @@
+﻿# Flutter/Dart
+.dart_tool/
+.packages
+build/
+.flutter-plugins
+.flutter-plugins-dependencies
+.idea/
+*.iml
+
+# Android (generado)
+android/.gradle/
+android/app/build/
+
+# iOS (no aplica, pero por si acaso)
+ios/Pods/
+
+# Secretos y configuración local
+.env
+*.log
+
+# Sistema
+.DS_Store
+Thumbs.db
