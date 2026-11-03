@@ -38,6 +38,7 @@ dependencies:
   flutter_secure_storage: ^11.2.0
   mobile_scanner: ^7.5.0
   provider: ^6.1.5+1
+  flutter_launcher_icons: ^0.14.4
 
 dev_dependencies:
   flutter_test:
@@ -91,3 +92,9 @@ flutter:
   #
   # For details regarding fonts from package dependencies,
   # see https://flutter.dev/to/font-from-package
+
+flutter_launcher_icons:
+  android: "launcher_icon"
+  ios: false
+  image_path: "assets/logo_appcheck.png"
+  min_sdk_android: 21

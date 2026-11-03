@@ -2,7 +2,11 @@ import 'dart:convert';
 import 'package:http/http.dart' as http;
 
 class ApiService {
-  static const String baseUrl = 'http://127.0.0.1:5123';
+  //static const String baseUrl = 'http://127.0.0.1:5123';
+  static const String baseUrl = String.fromEnvironment(
+    'API_URL',
+    defaultValue: 'https://api.appcheck.com.mx',
+  );
 
   // =====================================================
   // 1. Activar kiosko con código de 8 caracteres
