@@ -1,8 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:mobile_scanner/mobile_scanner.dart';
-import '../services/api_service.dart';
 import '../services/storage_service.dart';
-import 'confirmation_screen.dart';
+import 'facial_screen.dart';
 
 class ScannerScreen extends StatefulWidget {
   const ScannerScreen({super.key});
@@ -29,52 +28,18 @@ class _ScannerScreenState extends State<ScannerScreen> {
     setState(() => _procesando = true);
     _controller.stop();
 
-    // 👈 Capturamos el Navigator y el ScaffoldMessenger ANTES del await
-    final navigator = Navigator.of(context);
-    final messenger = ScaffoldMessenger.of(context);
+    // Navegar a la pantalla facial
+    if (!mounted) return;
+    await Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => FacialScreen(numeroEmpleado: codigo),
+      ),
+    );
 
-    try {
-      final token = await StorageService.leerToken();
-      if (token == null || token.isEmpty) {
-        throw Exception('No hay token de kiosko. Reactiva el dispositivo.');
-      }
-
-      final response = await ApiService.registrarChecada(
-        tokenPuntoLectura: token,
-        numeroEmpleado: codigo,
-        metodoUsado: 'QR',
-      );
-
-      if (!mounted) return;
-
-      // 👈 Usamos el navigator capturado, no el context
-      navigator.push(
-        MaterialPageRoute(
-          builder: (_) => ConfirmationScreen(
-            mensaje: response['mensaje'] as String,
-            tipoChecada: response['tipoChecada'] as String,
-            nombreEmpleado: response['empleado']['nombreCompleto'] as String,
-            hash: response['hash'] as String,
-            timestamp: response['timestampServidor'] as String,
-          ),
-        ),
-      ).then((_) {
-        if (!mounted) return;
-        setState(() => _procesando = false);
-        _controller.start();
-      });
-    } catch (e) {
-      if (!mounted) return;
-      setState(() => _procesando = false);
-      _controller.start();
-      // 👈 Usamos el messenger capturado, no el context
-      messenger.showSnackBar(
-        SnackBar(
-          content: Text(e.toString().replaceFirst('Exception: ', '')),
-          backgroundColor: Colors.red,
-        ),
-      );
-    }
+    if (!mounted) return;
+    setState(() => _procesando = false);
+    _controller.start();
   }
 
   @override
