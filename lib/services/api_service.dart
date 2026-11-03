@@ -68,10 +68,9 @@ class ApiService {
     required String tokenPuntoLectura,
     required String numeroEmpleado,
     required String metodoUsado,
+    String? fotoBase64, // 👈 Nuevo parámetro
   }) async {
     try {
-      print('🔵 Enviando checada a: $baseUrl/api/checada');
-      
       final response = await http.post(
         Uri.parse('$baseUrl/api/checada'),
         headers: {'Content-Type': 'application/json'},
@@ -81,11 +80,9 @@ class ApiService {
           'tipoChecada': 'Entrada',
           'metodoUsado': metodoUsado,
           'esOffline': false,
+          'fotoBase64': fotoBase64, // 👈 Enviar la foto
         }),
       );
-
-      print('🟢 Status code: ${response.statusCode}');
-      print('🟢 Body: ${response.body}');
 
       if (response.statusCode == 200) {
         return jsonDecode(response.body);
@@ -94,7 +91,6 @@ class ApiService {
         throw Exception(error['mensaje'] ?? 'Error al registrar checada');
       }
     } catch (e) {
-      print('🔴 Error: $e');
       throw Exception('Error al registrar checada: $e');
     }
   }

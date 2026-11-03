@@ -4,6 +4,7 @@ import 'package:google_mlkit_face_detection/google_mlkit_face_detection.dart';
 import '../services/api_service.dart';
 import '../services/storage_service.dart';
 import 'confirmation_screen.dart';
+import 'dart:convert';
 
 class FacialScreen extends StatefulWidget {
   final String numeroEmpleado;
@@ -76,10 +77,17 @@ class _FacialScreenState extends State<FacialScreen> {
       final token = await StorageService.leerToken();
       if (token == null) throw Exception('No hay token de kiosko.');
 
+      // Capturar la foto de la cámara
+      final image = await _cameraController!.takePicture();
+      final bytes = await image.readAsBytes();
+      final fotoBase64 = base64Encode(bytes);
+
+      // Enviar la foto a la API para la validación
       final response = await ApiService.registrarChecada(
         tokenPuntoLectura: token,
-        numeroEmpleado: widget.numeroEmpleado, // 👈 Usamos el número del QR
+        numeroEmpleado: widget.numeroEmpleado,
         metodoUsado: 'Facial',
+        fotoBase64: fotoBase64, // 👈 Enviar la foto
       );
 
       if (!mounted) return;
