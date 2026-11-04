@@ -10,11 +10,36 @@ class ScannerScreen extends StatefulWidget {
   State<ScannerScreen> createState() => _ScannerScreenState();
 }
 
-class _ScannerScreenState extends State<ScannerScreen> {
+class _ScannerScreenState extends State<ScannerScreen> with WidgetsBindingObserver {
   final MobileScannerController _controller = MobileScannerController(
     detectionSpeed: DetectionSpeed.noDuplicates,
   );
   bool _procesando = false;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addObserver(this);
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    // Reactivar la cámara cuando la app vuelve a primer plano
+    if (state == AppLifecycleState.resumed) {
+      if (!_controller.value.isRunning) {
+        _controller.start();
+      }
+    } else if (state == AppLifecycleState.paused) {
+      _controller.stop();
+    }
+  }
 
   Future<void> _onDetect(BarcodeCapture capture) async {
     if (_procesando) return;
@@ -37,9 +62,23 @@ class _ScannerScreenState extends State<ScannerScreen> {
       ),
     );
 
+    // Al regresar, reiniciar el escáner con un pequeño delay
     if (!mounted) return;
     setState(() => _procesando = false);
-    _controller.start();
+    
+    // Esperar 1 segundo para que la cámara frontal se libere
+    await Future.delayed(const Duration(seconds: 1));
+    
+    if (mounted) {
+      try {
+        await _controller.start();
+      } catch (e) {
+        // Si falla, forzar reconstrucción de la pantalla
+        if (mounted) {
+          setState(() {});
+        }
+      }
+    }
   }
 
   @override
