@@ -68,7 +68,7 @@ class ApiService {
     required String tokenPuntoLectura,
     required String numeroEmpleado,
     required String metodoUsado,
-    String? fotoBase64, // 👈 Nuevo parámetro
+    String? fotoBase64,
   }) async {
     try {
       final response = await http.post(
@@ -93,5 +93,30 @@ class ApiService {
     } catch (e) {
       throw Exception('Error al registrar checada: $e');
     }
+  }
+
+  // 3. Obtener el método de lectura del empleado
+  static Future<Map<String, dynamic>> obtenerMetodoLectura({
+    required String numeroEmpleado,
+    required String tokenKiosko,
+  }) async {
+    final response = await http.get(
+      Uri.parse('$baseUrl/api/employee/metodo-lectura/$numeroEmpleado?tokenKiosko=$tokenKiosko'),
+    );
+    if (response.statusCode == 200) return jsonDecode(response.body);
+    throw Exception(jsonDecode(response.body)['mensaje'] ?? 'Error al obtener método');
+  }
+
+  // 3. Recuperar token (si el kiosko ya está activo)
+  static Future<Map<String, dynamic>> recuperarToken({
+    required String deviceId,
+  }) async {
+    final response = await http.post(
+      Uri.parse('$baseUrl/api/kiosko/recuperar'),
+      headers: {'Content-Type': 'application/json'},
+      body: jsonEncode({'deviceId': deviceId}),
+    );
+    if (response.statusCode == 200) return jsonDecode(response.body);
+    throw Exception(jsonDecode(response.body)['mensaje'] ?? 'Error al recuperar token');
   }
 }

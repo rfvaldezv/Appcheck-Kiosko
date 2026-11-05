@@ -8,8 +8,9 @@ import 'dart:convert';
 
 class FacialScreen extends StatefulWidget {
   final String numeroEmpleado;
-  const FacialScreen({super.key, required this.numeroEmpleado});
-
+  final String metodoUsado;
+  const FacialScreen({super.key, required this.numeroEmpleado, this.metodoUsado = 'Mix'});
+  
   @override
   State<FacialScreen> createState() => _FacialScreenState();
 }
@@ -86,8 +87,8 @@ class _FacialScreenState extends State<FacialScreen> {
       final response = await ApiService.registrarChecada(
         tokenPuntoLectura: token,
         numeroEmpleado: widget.numeroEmpleado,
-        metodoUsado: 'Facial',
-        fotoBase64: fotoBase64, // 👈 Enviar la foto
+	metodoUsado: widget.metodoUsado,
+        fotoBase64: fotoBase64,
       );
 
       if (!mounted) return;

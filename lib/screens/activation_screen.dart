@@ -18,10 +18,43 @@ class _ActivationScreenState extends State<ActivationScreen> {
   String? _error;
 
   @override
-  void dispose() {
-    _codigoController.dispose();
-    _nombreKioskoController.dispose();
-    super.dispose();
+  void initState() {
+    super.initState();
+    _intentarRecuperarToken();
+  }
+
+  Future<void> _intentarRecuperarToken() async {
+    setState(() => _cargando = true);
+
+    try {
+      // 1. Obtener el DeviceId real (o leerlo si ya se guardó)
+      String? deviceId = await StorageService.leerDeviceId();
+      
+      if (deviceId == null || deviceId.isEmpty) {
+        deviceId = await StorageService.obtenerDeviceIdReal();
+        await StorageService.guardarDeviceId(deviceId);
+      }
+
+      // 2. Intentar recuperar el token con el DeviceId
+      final response = await ApiService.recuperarToken(deviceId: deviceId);
+
+      if (response['tokenPuntoLectura'] != null) {
+        // 3. Guardar el token y el nombre
+        await StorageService.guardarToken(response['tokenPuntoLectura'] as String);
+        await StorageService.guardarNombreKiosko(response['nombre'] as String);
+
+        if (!mounted) return;
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(builder: (_) => const ScannerScreen()),
+        );
+      }
+    } catch (e) {
+      // Si falla la recuperación, mostramos la pantalla de activación normal
+      setState(() => _error = null); // No mostramos error, solo pedimos código
+    } finally {
+      if (mounted) setState(() => _cargando = false);
+    }
   }
 
   Future<void> _activarKiosko() async {
@@ -39,8 +72,15 @@ class _ActivationScreenState extends State<ActivationScreen> {
     });
 
     try {
-      final deviceId = 'tablet-${DateTime.now().millisecondsSinceEpoch}';
+      // 1. Obtener el DeviceId real
+      String? deviceId = await StorageService.leerDeviceId();
+      
+      if (deviceId == null || deviceId.isEmpty) {
+        deviceId = await StorageService.obtenerDeviceIdReal();
+        await StorageService.guardarDeviceId(deviceId);
+      }
 
+      // 2. Llamar a la API para activar
       final response = await ApiService.activarKiosko(
         codigo: codigo,
         deviceId: deviceId,
@@ -50,6 +90,7 @@ class _ActivationScreenState extends State<ActivationScreen> {
       final token = response['tokenPuntoLectura'] as String;
       final nombreKiosko = response['nombre'] as String;
 
+      // 3. Guardar el token y el nombre
       await StorageService.guardarToken(token);
       await StorageService.guardarNombreKiosko(nombreKiosko);
 
@@ -83,6 +124,12 @@ class _ActivationScreenState extends State<ActivationScreen> {
 
   @override
   Widget build(BuildContext context) {
+    if (_cargando) {
+      return const Scaffold(
+        body: Center(child: CircularProgressIndicator()),
+      );
+    }
+
     return Scaffold(
       backgroundColor: Colors.white,
       body: SafeArea(
@@ -185,16 +232,10 @@ class _ActivationScreenState extends State<ActivationScreen> {
                   height: 56,
                   child: ElevatedButton.icon(
                     onPressed: _cargando ? null : _activarKiosko,
-                    icon: _cargando
-                        ? const SizedBox(
-                            width: 20,
-                            height: 20,
-                            child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
-                          )
-                        : const Icon(Icons.check_circle),
-                    label: Text(
-                      _cargando ? 'Activando...' : 'Activar Kiosko',
-                      style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                    icon: const Icon(Icons.check_circle),
+                    label: const Text(
+                      'Activar Kiosko',
+                      style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
                     ),
                     style: ElevatedButton.styleFrom(
                       backgroundColor: const Color(0xFF0F766E),

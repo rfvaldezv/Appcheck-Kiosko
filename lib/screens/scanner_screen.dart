@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:mobile_scanner/mobile_scanner.dart';
 import '../services/storage_service.dart';
+import '../services/api_service.dart';
 import 'facial_screen.dart';
+import 'confirmation_screen.dart';
 
 class ScannerScreen extends StatefulWidget {
   const ScannerScreen({super.key});
@@ -15,11 +17,13 @@ class _ScannerScreenState extends State<ScannerScreen> with WidgetsBindingObserv
     detectionSpeed: DetectionSpeed.noDuplicates,
   );
   bool _procesando = false;
+  String? _nombreKiosko;
 
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
+    _cargarNombreKiosko();
   }
 
   @override
@@ -29,9 +33,13 @@ class _ScannerScreenState extends State<ScannerScreen> with WidgetsBindingObserv
     super.dispose();
   }
 
+  Future<void> _cargarNombreKiosko() async {
+    final nombre = await StorageService.leerNombreKiosko();
+    if (mounted) setState(() => _nombreKiosko = nombre);
+  }
+
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
-    // Reactivar la cámara cuando la app vuelve a primer plano
     if (state == AppLifecycleState.resumed) {
       if (!_controller.value.isRunning) {
         _controller.start();
@@ -47,37 +55,100 @@ class _ScannerScreenState extends State<ScannerScreen> with WidgetsBindingObserv
     final barcodes = capture.barcodes;
     if (barcodes.isEmpty) return;
 
-    final codigo = barcodes.first.rawValue;
-    if (codigo == null || codigo.isEmpty) return;
+    final rawValue = barcodes.first.rawValue;
+    if (rawValue == null) return;
+
+    final codigo = rawValue.trim().replaceAll(RegExp(r'[^A-Za-z0-9]'), '');
+    if (codigo.isEmpty) return;
+
+    print('🔵 QR RAW: "$rawValue"');
+    print('🔵 QR LIMPIO: "$codigo"');
 
     setState(() => _procesando = true);
     _controller.stop();
 
-    // Navegar a la pantalla facial
-    if (!mounted) return;
-    await Navigator.push(
-      context,
-      MaterialPageRoute(
-        builder: (_) => FacialScreen(numeroEmpleado: codigo),
-      ),
-    );
+    try {
+      final token = await StorageService.leerToken();
+      if (token == null) throw Exception('No hay token de kiosko.');
+      print('🔵 TOKEN DEL KIOSKO EN EL CELULAR: $token');
 
-    // Al regresar, reiniciar el escáner con un pequeño delay
-    if (!mounted) return;
-    setState(() => _procesando = false);
-    
-    // Esperar 1 segundo para que la cámara frontal se libere
-    await Future.delayed(const Duration(seconds: 1));
-    
-    if (mounted) {
-      try {
-        await _controller.start();
-      } catch (e) {
-        // Si falla, forzar reconstrucción de la pantalla
-        if (mounted) {
-          setState(() {});
-        }
+      print('🟡 Llamando a obtenerMetodoLectura con codigo: $codigo');
+      final metodoInfo = await ApiService.obtenerMetodoLectura(
+        numeroEmpleado: codigo,
+        tokenKiosko: token,
+      );
+      print('🟡 Respuesta de obtenerMetodoLectura: $metodoInfo');
+
+      final metodoLectura = metodoInfo['metodoLectura'] as String;
+      print('🟡 Método de lectura: $metodoLectura');
+
+      if (metodoLectura == 'QR') {
+        print('🟢 Modo Solo QR. Registrando checada...');
+        final response = await ApiService.registrarChecada(
+          tokenPuntoLectura: token,
+          numeroEmpleado: codigo,
+          metodoUsado: 'QR',
+        );
+        print('🟢 Respuesta de registrarChecada: $response');
+
+        if (!mounted) return;
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(
+            builder: (_) => ConfirmationScreen(
+              mensaje: response['mensaje'] as String,
+              tipoChecada: response['tipoChecada'] as String,
+              nombreEmpleado: response['empleado']['nombreCompleto'] as String,
+              hash: response['hash'] as String,
+              timestamp: response['timestampServidor'] as String,
+            ),
+          ),
+        );
+      } else {
+        print('🟢 Modo $metodoLectura. Navegando a FacialScreen...');
+        if (!mounted) return;
+        await Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (_) => FacialScreen(numeroEmpleado: codigo, metodoUsado: metodoLectura),
+          ),
+        );
+        
+        if (!mounted) return;
+        setState(() => _procesando = false);
+        await Future.delayed(const Duration(seconds: 1));
+        if (mounted) await _controller.start();
       }
+    } catch (e) {
+      print('🔴 Error en _onDetect: $e');
+      if (!mounted) return;
+      setState(() => _procesando = false);
+
+      // 👈 MOSTRAR EL TOKEN EN UN DIÁLOGO (SOLO PARA DEBUG)
+      final token = await StorageService.leerToken();
+      if (!mounted) return;
+      
+      showDialog(
+        context: context,
+        builder: (context) => AlertDialog(
+          title: const Text('Error de Kiosko'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text('Error: $e'),
+              const SizedBox(height: 16),
+              const Text('Token del celular:', style: TextStyle(fontWeight: FontWeight.bold)),
+              SelectableText(token ?? 'NO HAY TOKEN', style: const TextStyle(fontFamily: 'monospace', fontSize: 12)),
+            ],
+          ),
+          actions: [
+            TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cerrar')),
+          ],
+        ),
+      );
+
+      await Future.delayed(const Duration(seconds: 1));
+      if (mounted) await _controller.start();
     }
   }
 
@@ -88,7 +159,17 @@ class _ScannerScreenState extends State<ScannerScreen> with WidgetsBindingObserv
       appBar: AppBar(
         backgroundColor: const Color(0xFF0F766E),
         foregroundColor: Colors.white,
-        title: const Text('AppCheck Kiosko'),
+        title: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text('AppCheck Kiosko', style: TextStyle(fontSize: 18)),
+            if (_nombreKiosko != null)
+              Text(
+                _nombreKiosko!,
+                style: const TextStyle(fontSize: 12, color: Colors.white70),
+              ),
+          ],
+        ),
         actions: [
           IconButton(
             icon: const Icon(Icons.logout),
