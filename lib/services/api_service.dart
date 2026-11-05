@@ -107,7 +107,7 @@ class ApiService {
     throw Exception(jsonDecode(response.body)['mensaje'] ?? 'Error al obtener método');
   }
 
-  // 3. Recuperar token (si el kiosko ya está activo)
+  // 4. Recuperar token (si el kiosko ya está activo)
   static Future<Map<String, dynamic>> recuperarToken({
     required String deviceId,
   }) async {
@@ -118,5 +118,22 @@ class ApiService {
     );
     if (response.statusCode == 200) return jsonDecode(response.body);
     throw Exception(jsonDecode(response.body)['mensaje'] ?? 'Error al recuperar token');
+  }
+
+  // 5. Validar PIN (para el modo PIN o PIN+Rostro)
+  static Future<Map<String, dynamic>> validarPin({
+    required String numeroEmpleado,
+    required String pin,
+  }) async {
+    final response = await http.post(
+      Uri.parse('$baseUrl/api/employee/validar-pin'),
+      headers: {'Content-Type': 'application/json'},
+      body: jsonEncode({
+        'numeroEmpleado': numeroEmpleado,
+        'pin': pin,
+      }),
+    );
+    if (response.statusCode == 200) return jsonDecode(response.body);
+    throw Exception(jsonDecode(response.body)['mensaje'] ?? 'PIN incorrecto');
   }
 }

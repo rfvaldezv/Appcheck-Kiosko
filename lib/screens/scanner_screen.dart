@@ -4,6 +4,7 @@ import '../services/storage_service.dart';
 import '../services/api_service.dart';
 import 'facial_screen.dart';
 import 'confirmation_screen.dart';
+import 'pin_screen.dart'; // 👈 Importar la pantalla de PIN
 
 class ScannerScreen extends StatefulWidget {
   const ScannerScreen({super.key});
@@ -82,7 +83,9 @@ class _ScannerScreenState extends State<ScannerScreen> with WidgetsBindingObserv
       final metodoLectura = metodoInfo['metodoLectura'] as String;
       print('🟡 Método de lectura: $metodoLectura');
 
+      // 👈 NUEVA LÓGICA DE MODALIDADES
       if (metodoLectura == 'QR') {
+        // Modo Solo QR: registrar directo
         print('🟢 Modo Solo QR. Registrando checada...');
         final response = await ApiService.registrarChecada(
           tokenPuntoLectura: token,
@@ -104,7 +107,8 @@ class _ScannerScreenState extends State<ScannerScreen> with WidgetsBindingObserv
             ),
           ),
         );
-      } else {
+      } else if (metodoLectura == 'Rostro' || metodoLectura == 'QR+Rostro' || metodoLectura == 'PIN+Rostro') {
+        // Modo con Rostro: ir a la pantalla facial
         print('🟢 Modo $metodoLectura. Navegando a FacialScreen...');
         if (!mounted) return;
         await Navigator.push(
@@ -118,13 +122,51 @@ class _ScannerScreenState extends State<ScannerScreen> with WidgetsBindingObserv
         setState(() => _procesando = false);
         await Future.delayed(const Duration(seconds: 1));
         if (mounted) await _controller.start();
+      } else if (metodoLectura == 'PIN') {
+        // Modo Solo PIN: registrar directo (sin cámara)
+        print('🟢 Modo Solo PIN. Registrando checada...');
+        final response = await ApiService.registrarChecada(
+          tokenPuntoLectura: token,
+          numeroEmpleado: codigo,
+          metodoUsado: 'PIN',
+        );
+        print('🟢 Respuesta de registrarChecada: $response');
+
+        if (!mounted) return;
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(
+            builder: (_) => ConfirmationScreen(
+              mensaje: response['mensaje'] as String,
+              tipoChecada: response['tipoChecada'] as String,
+              nombreEmpleado: response['empleado']['nombreCompleto'] as String,
+              hash: response['hash'] as String,
+              timestamp: response['timestampServidor'] as String,
+            ),
+          ),
+        );
+      } else {
+        // Por defecto, tratar como QR+Rostro (para no romper nada)
+        print('🟡 Método no reconocido: $metodoLectura. Tratando como QR+Rostro...');
+        if (!mounted) return;
+        await Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (_) => FacialScreen(numeroEmpleado: codigo, metodoUsado: 'QR+Rostro'),
+          ),
+        );
+        
+        if (!mounted) return;
+        setState(() => _procesando = false);
+        await Future.delayed(const Duration(seconds: 1));
+        if (mounted) await _controller.start();
       }
     } catch (e) {
       print('🔴 Error en _onDetect: $e');
       if (!mounted) return;
       setState(() => _procesando = false);
 
-      // 👈 MOSTRAR EL TOKEN EN UN DIÁLOGO (SOLO PARA DEBUG)
+      // Mostrar el token en un diálogo (solo para debug)
       final token = await StorageService.leerToken();
       if (!mounted) return;
       
@@ -214,6 +256,22 @@ class _ScannerScreenState extends State<ScannerScreen> with WidgetsBindingObserv
                   style: TextStyle(color: Colors.white, fontSize: 16),
                 ),
               ),
+            ),
+          ),
+          // 👈 BOTÓN DE PIN
+          Positioned(
+            bottom: 20,
+            left: 20,
+            child: FloatingActionButton.extended(
+              onPressed: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (_) => const PinScreen()),
+                );
+              },
+              backgroundColor: const Color(0xFF0F766E),
+              icon: const Icon(Icons.keyboard, color: Colors.white),
+              label: const Text('Usar PIN', style: TextStyle(color: Colors.white)),
             ),
           ),
           if (_procesando)
