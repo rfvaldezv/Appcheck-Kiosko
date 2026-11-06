@@ -64,13 +64,64 @@ class _PinScreenState extends State<PinScreen> {
             ),
           ),
         );
-      } else if (metodoLectura == 'PIN+Facial' || metodoLectura == 'Facial') {
-        // 3. Si es PIN + Rostro, ir a la pantalla facial
+      } else if (metodoLectura == 'PIN+Rostro') {
+        // 3. PIN + Rostro: ir a la pantalla facial con nombre canónico
         if (!mounted) return;
         Navigator.pushReplacement(
           context,
           MaterialPageRoute(
-            builder: (_) => FacialScreen(numeroEmpleado: numero, metodoUsado: 'PIN+Facial'),
+            builder: (_) => FacialScreen(
+              numeroEmpleado: numero,
+              metodoUsado: 'PIN+Rostro',
+            ),
+          ),
+        );
+      } else if (metodoLectura == 'Rostro') {
+        // 4. Solo Rostro: ir a la pantalla facial
+        if (!mounted) return;
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(
+            builder: (_) => FacialScreen(
+              numeroEmpleado: numero,
+              metodoUsado: 'Rostro',
+            ),
+          ),
+        );
+      } else if (metodoLectura == 'QR+Rostro') {
+        // 5. QR + Rostro (por si el empleado lo tiene configurado así)
+        if (!mounted) return;
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(
+            builder: (_) => FacialScreen(
+              numeroEmpleado: numero,
+              metodoUsado: 'QR+Rostro',
+            ),
+          ),
+        );
+      } else if (metodoLectura == 'QR') {
+        // 6. QR solo (aunque venga por PIN, respetamos su método preferido)
+        final token = await StorageService.leerToken();
+        if (token == null) throw Exception('No hay token de kiosko.');
+
+        final checada = await ApiService.registrarChecada(
+          tokenPuntoLectura: token,
+          numeroEmpleado: numero,
+          metodoUsado: 'QR',
+        );
+
+        if (!mounted) return;
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(
+            builder: (_) => ConfirmationScreen(
+              mensaje: checada['mensaje'] as String,
+              tipoChecada: checada['tipoChecada'] as String,
+              nombreEmpleado: checada['empleado']['nombreCompleto'] as String,
+              hash: checada['hash'] as String,
+              timestamp: checada['timestampServidor'] as String,
+            ),
           ),
         );
       } else {
@@ -81,6 +132,13 @@ class _PinScreenState extends State<PinScreen> {
     } finally {
       if (mounted) setState(() => _cargando = false);
     }
+  }
+
+  @override
+  void dispose() {
+    _numeroController.dispose();
+    _pinController.dispose();
+    super.dispose();
   }
 
   @override
@@ -128,7 +186,9 @@ class _PinScreenState extends State<PinScreen> {
               height: 56,
               child: ElevatedButton.icon(
                 onPressed: _cargando ? null : _validarPin,
-                icon: _cargando ? const CircularProgressIndicator(color: Colors.white) : const Icon(Icons.check_circle),
+                icon: _cargando
+                    ? const CircularProgressIndicator(color: Colors.white)
+                    : const Icon(Icons.check_circle),
                 label: Text(_cargando ? 'Validando...' : 'Checar'),
                 style: ElevatedButton.styleFrom(
                   backgroundColor: const Color(0xFF0F766E),

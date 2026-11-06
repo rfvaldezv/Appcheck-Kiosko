@@ -5,11 +5,12 @@ import '../services/api_service.dart';
 import '../services/storage_service.dart';
 import 'confirmation_screen.dart';
 import 'dart:convert';
+import 'package:image/image.dart' as img;
 
 class FacialScreen extends StatefulWidget {
   final String numeroEmpleado;
   final String metodoUsado;
-  const FacialScreen({super.key, required this.numeroEmpleado, this.metodoUsado = 'Mix'});
+  const FacialScreen({super.key, required this.numeroEmpleado, this.metodoUsado = 'Rostro'});
   
   @override
   State<FacialScreen> createState() => _FacialScreenState();
@@ -52,15 +53,14 @@ class _FacialScreenState extends State<FacialScreen> {
       if (!mounted) return;
 
       _cameraController!.startImageStream((image) async {
-        if (_procesando) return;
-        // Para el MVP, solo detectamos que haya un rostro en la imagen
-        // La conversión real de CameraImage a InputImage requiere un método más complejo
-        // que omitiremos para esta prueba inicial.
-        if (mounted) {
-          setState(() {
-            _rostroDetectado = true; // Simulamos detección para el MVP
-          });
-        }
+          if (_procesando) return;
+          // TODO Sprint B: Implementar detección real con ML Kit
+          // (CameraImage → InputImage requiere conversión YUV → RGB)
+          // Por ahora: el rostro se valida 100% en el BACKEND con FaceONNX.
+          // El ML Kit aquí solo serviría para UX (avisar "coloca tu rostro").
+          if (mounted && !_rostroDetectado) {
+              setState(() => _rostroDetectado = true);
+          }
       });
 
       setState(() {});
@@ -80,8 +80,12 @@ class _FacialScreenState extends State<FacialScreen> {
 
       // Capturar la foto de la cámara
       final image = await _cameraController!.takePicture();
+      // Comprimir la imagen a 300x300 (suficiente para la IA)
       final bytes = await image.readAsBytes();
-      final fotoBase64 = base64Encode(bytes);
+      final originalImage = img.decodeImage(bytes);
+      final resizedImage = img.copyResize(originalImage!, width: 300, height: 300);
+      final compressedBytes = img.encodeJpg(resizedImage, quality: 80);
+      final fotoBase64 = base64Encode(compressedBytes);
 
       // Enviar la foto a la API para la validación
       final response = await ApiService.registrarChecada(
