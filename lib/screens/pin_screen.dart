@@ -156,7 +156,7 @@ class _PinScreenState extends State<PinScreen> {
           children: [
             TextField(
               controller: _numeroController,
-              keyboardType: TextInputType.number,
+              keyboardType: TextInputType.text,
               textAlign: TextAlign.center,
               style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
               decoration: const InputDecoration(
