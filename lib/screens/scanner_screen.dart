@@ -107,7 +107,7 @@ class _ScannerScreenState extends State<ScannerScreen> with WidgetsBindingObserv
             ),
           ),
         );
-      } else if (metodoLectura == 'Rostro' || metodoLectura == 'QR+Rostro' || metodoLectura == 'PIN+Rostro') {
+        } else if (metodoLectura == 'Rostro' || metodoLectura == 'QR+Rostro' || metodoLectura == 'ID+Rostro') {
         // Modo con Rostro: ir a la pantalla facial
         print('🟢 Modo $metodoLectura. Navegando a FacialScreen...');
         if (!mounted) return;
@@ -146,20 +146,18 @@ class _ScannerScreenState extends State<ScannerScreen> with WidgetsBindingObserv
           ),
         );
       } else {
-        // Por defecto, tratar como QR+Rostro (para no romper nada)
-        print('🟡 Método no reconocido: $metodoLectura. Tratando como QR+Rostro...');
-        if (!mounted) return;
-        await Navigator.push(
-          context,
-          MaterialPageRoute(
-            builder: (_) => FacialScreen(numeroEmpleado: codigo, metodoUsado: 'QR+Rostro'),
-          ),
-        );
-        
-        if (!mounted) return;
-        setState(() => _procesando = false);
-        await Future.delayed(const Duration(seconds: 1));
-        if (mounted) await _controller.start();
+          // Método no reconocido → no debería pasar. Loguear y mostrar error.
+          print('❌ Método no reconocido: $metodoLectura');
+          if (!mounted) return;
+          ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                  content: Text('Método de lectura no soportado: $metodoLectura'),
+                  duration: const Duration(seconds: 3),
+              ),
+          );
+          setState(() => _procesando = false);
+          await Future.delayed(const Duration(seconds: 1));
+          if (mounted) await _controller.start();
       }
     } catch (e) {
       print('🔴 Error en _onDetect: $e');
@@ -218,7 +216,7 @@ class _ScannerScreenState extends State<ScannerScreen> with WidgetsBindingObserv
             tooltip: 'Desactivar kiosko',
             onPressed: () async {
               await StorageService.borrarTodo();
-              if (!mounted) return;
+              if (!context.mounted) return;                 // ← FIX
               Navigator.pushReplacementNamed(context, '/');
             },
           ),

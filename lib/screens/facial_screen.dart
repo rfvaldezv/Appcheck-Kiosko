@@ -33,6 +33,23 @@ class _FacialScreenState extends State<FacialScreen> {
   void initState() {
     super.initState();
     _inicializarCamara();
+    _recuperarTokenInicial();
+  }
+
+  Future<void> _recuperarTokenInicial() async {
+    try {
+      final deviceId = await StorageService.leerDeviceId();
+      if (deviceId != null && deviceId.isNotEmpty) {
+        final rec = await ApiService.recuperarToken(deviceId: deviceId);
+        final tokenNuevo = rec['tokenPuntoLectura'] as String?;
+        if (tokenNuevo != null && tokenNuevo.isNotEmpty) {
+          await StorageService.guardarToken(tokenNuevo);
+          print('✅ Token recuperado al abrir FacialScreen');
+        }
+      }
+    } catch (e) {
+      print('⚠️ No se pudo recuperar token inicial: $e');
+    }
   }
 
   Future<void> _inicializarCamara() async {
@@ -91,8 +108,9 @@ class _FacialScreenState extends State<FacialScreen> {
       final response = await ApiService.registrarChecada(
         tokenPuntoLectura: token,
         numeroEmpleado: widget.numeroEmpleado,
-	metodoUsado: widget.metodoUsado,
+        metodoUsado: widget.metodoUsado,
         fotoBase64: fotoBase64,
+        // pin: null,  // No aplica para métodos con rostro
       );
 
       if (!mounted) return;

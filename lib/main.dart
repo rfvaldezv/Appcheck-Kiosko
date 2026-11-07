@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'screens/activation_screen.dart';
 import 'screens/scanner_screen.dart';
 import 'services/storage_service.dart';
+import 'services/api_service.dart';
 
 void main() {
   runApp(const AppCheckKioskoApp());
@@ -40,22 +41,75 @@ class _SplashScreenState extends State<SplashScreen> {
   @override
   void initState() {
     super.initState();
-    _verificarToken();
+    _inicializar();
   }
 
-  Future<void> _verificarToken() async {
-    await Future.delayed(const Duration(seconds: 1));
-
-    final token = await StorageService.leerToken();
+  Future<void> _inicializar() async {
+    await Future.delayed(const Duration(milliseconds: 800));
 
     if (!mounted) return;
 
-    if (token != null && token.isNotEmpty) {
-	Navigator.pushReplacement(
-	 context,
-	 MaterialPageRoute(builder: (_) => const ScannerScreen()),
-	);
-    } else {
+    try {
+      // 🔧 FIX: SIEMPRE recuperar token por deviceId (no solo si no hay)
+      // Esto resuelve el problema del "token viejo" que causaba 401.
+      
+      var deviceIdGuardado = await StorageService.leerDeviceId();
+
+      // 🔧 FIX: si no hay deviceId en storage, obtenerlo del hardware y guardarlo
+      if (deviceIdGuardado == null || deviceIdGuardado.isEmpty) {
+          print('⚠️ No hay deviceId guardado. Obteniendo del hardware...');
+          try {
+               deviceIdGuardado = await StorageService.obtenerDeviceIdReal();
+               await StorageService.guardarDeviceId(deviceIdGuardado);
+               print('✅ DeviceId guardado: $deviceIdGuardado');
+          } catch (e) {
+              print('❌ Error obteniendo deviceId del hardware: $e');
+          }
+      }
+
+      if (deviceIdGuardado != null && deviceIdGuardado.isNotEmpty) {
+        // Hay deviceId registrado → intentar recuperar token fresco
+        try {
+          print('🔄 Recuperando token por deviceId: $deviceIdGuardado');
+          final response = await ApiService.recuperarToken(deviceId: deviceIdGuardado);
+          
+          final tokenNuevo = response['tokenPuntoLectura'] as String?;
+          if (tokenNuevo != null && tokenNuevo.isNotEmpty) {
+            await StorageService.guardarToken(tokenNuevo);
+            print('✅ Token recuperado y guardado: ${tokenNuevo.substring(0, 8)}...');
+            
+            if (!mounted) return;
+            Navigator.pushReplacement(
+              context,
+              MaterialPageRoute(builder: (_) => const ScannerScreen()),
+            );
+            return;
+          }
+        } catch (e) {
+          print('⚠️ Error recuperando token: $e');
+          // Si falla recuperación, intentar con token guardado (fallback)
+          final tokenGuardado = await StorageService.leerToken();
+          if (tokenGuardado != null && tokenGuardado.isNotEmpty) {
+            if (!mounted) return;
+            Navigator.pushReplacement(
+              context,
+              MaterialPageRoute(builder: (_) => const ScannerScreen()),
+            );
+            return;
+          }
+        }
+      }
+      
+      // Si no hay deviceId ni token, pedir activación
+      print('⚠️ Sin deviceId ni token, ir a activación');
+      if (!mounted) return;
+      Navigator.pushReplacement(
+        context,
+        MaterialPageRoute(builder: (_) => const ActivationScreen()),
+      );
+    } catch (e) {
+      print('❌ Error en inicialización: $e');
+      if (!mounted) return;
       Navigator.pushReplacement(
         context,
         MaterialPageRoute(builder: (_) => const ActivationScreen()),
@@ -87,6 +141,11 @@ class _SplashScreenState extends State<SplashScreen> {
             ),
             const SizedBox(height: 40),
             const CircularProgressIndicator(color: Colors.white),
+            const SizedBox(height: 16),
+            const Text(
+              'Recuperando token...',
+              style: TextStyle(color: Colors.white70, fontSize: 12),
+            ),
           ],
         ),
       ),

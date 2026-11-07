@@ -15,6 +15,10 @@ class StorageService {
     return await _storage.read(key: _keyTokenPuntoLectura);
   }
 
+  static Future<void> borrarToken() async {
+    await _storage.delete(key: _keyTokenPuntoLectura);
+  }
+
   static Future<void> guardarNombreKiosko(String nombre) async {
     await _storage.write(key: _keyNombreKiosko, value: nombre);
   }
